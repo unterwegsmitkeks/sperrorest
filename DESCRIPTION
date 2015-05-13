@@ -1,0 +1,26 @@
+Package: sperrorest
+Type: Package
+Title: Spatial Error Estimation and Variable Importance
+Version: 0.2-2
+Date: 2015-05-11
+Author: Alexander Brenning
+Maintainer: Alexander Brenning <alexander.brenning@uni-jena.de>
+Depends:
+    ROCR,
+    rpart
+Suggests:
+    ipred,
+    RSAGA,
+    sp
+Description: This package implements spatial error estimation and
+    permutation-based variable importance measures for predictive models using
+    spatial cross-validation and spatial block bootstrap.
+License: GPL-2
+LazyLoad: yes
+Collate:
+    'sperrorest-package.R'
+    'sperrorest.R'
+    'sperrorest_misc.R'
+    'sperrorest_resampling.R'
+    'sperrorest_error.R'
+    'sperrorest_data.R'

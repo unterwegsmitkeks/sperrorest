@@ -1,0 +1,9 @@
+citHeader("To cite package 'sperrorest' in publications use:")
+citEntry(entry="InProceedings",
+    author = person("Alexander","Brenning"),
+    title = "Spatial cross-validation and bootstrap for the assessment of prediction rules in remote sensing: the R package 'sperrorest'",
+    booktitle = "2012 IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 23-27 July 2012",
+    year = "2012",
+    pages = "5372--5375",
+    textVersion = "Brenning, A., 2012. Spatial cross-validation and bootstrap for the assessment of prediction rules in remote sensing: the R package 'sperrorest'. 2012 IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 23-27 July 2012, pp. 5372-5375, doi: 10.1109/IGARSS.2012.6352393"
+  )
