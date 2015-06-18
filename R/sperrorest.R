@@ -73,48 +73,48 @@
 #' @export
 summary.sperroresterror = function(object, level = 0, pooled = TRUE, na.rm = TRUE, ...)
 {
-  err = unclass(object)
-  if (pooled) {
-    if (level <= 2)
-      err = lapply(err, function(x) t(sapply(x, function(y) data.frame(train = y$train, test = y$test, 
-                                                                       distance = ifelse(any(names(y)=="distance"),y$distance,-1)))) )
-    if (level <= 1) {
-      errdf = err[[1]]
-      if (length(err) > 1) {
-        for (i in 2:length(err)) {
-          errdf = rbind(errdf, err[[i]])
+    err = unclass(object)
+    if (pooled) {
+        if (level <= 2)
+            err = lapply(err, function(x) t(sapply(x, function(y) data.frame(train = y$train, test = y$test, 
+                distance = ifelse(any(names(y)=="distance"),y$distance,-1)))) )
+        if (level <= 1) {
+            errdf = err[[1]]
+            if (length(err) > 1) {
+                for (i in 2:length(err)) {
+                    errdf = rbind(errdf, err[[i]])
+                }
+            }
+            rownames(errdf) = NULL
+            err = as.data.frame(errdf)
         }
-      }
-      rownames(errdf) = NULL
-      err = as.data.frame(errdf)
+        if (level <= 0) {
+            err = data.frame(
+                mean   = apply(err, 2, function(y) mean(unlist(y), na.rm = na.rm)),
+                sd     = apply(err, 2, function(y) sd(unlist(y), na.rm = na.rm)),
+                median = apply(err, 2, function(y) median(unlist(y), na.rm = na.rm)),
+                IQR    = apply(err, 2, function(y) IQR(unlist(y), na.rm = na.rm)) )
+        }
+    } else {
+        if (level <= 2)
+            err = lapply(err, function(x) t(sapply(x, function(y) data.frame(train = y$train, test = y$test, 
+                distance = ifelse(any(names(y)=="distance"),y$distance,-1)))) )
+        if (level <= 1) {
+            ###w = summary.partition(resampling) ?????
+            err = lapply( err, function(x) apply(x, 2, function(y) weighted.mean(unlist(y), na.rm = na.rm)) )
+            nms = names(err)
+            err = as.data.frame(t(as.data.frame(err)))
+            rownames(err) = nms
+        }
+        if (level <= 0) {
+            err = data.frame(
+                mean = sapply(err, mean), 
+                sd = sapply(err, sd),
+                median = sapply(err, median),
+                IQR = sapply(err, IQR))
+        }
     }
-    if (level <= 0) {
-      err = data.frame(
-        mean   = apply(err, 2, function(y) mean(unlist(y), na.rm = na.rm)),
-        sd     = apply(err, 2, function(y) sd(unlist(y), na.rm = na.rm)),
-        median = apply(err, 2, function(y) median(unlist(y), na.rm = na.rm)),
-        IQR    = apply(err, 2, function(y) IQR(unlist(y), na.rm = na.rm)) )
-    }
-  } else {
-    if (level <= 2)
-      err = lapply(err, function(x) t(sapply(x, function(y) data.frame(train = y$train, test = y$test, 
-                                                                       distance = ifelse(any(names(y)=="distance"),y$distance,-1)))) )
-    if (level <= 1) {
-      ###w = summary.partition(resampling) ?????
-      err = lapply( err, function(x) apply(x, 2, function(y) weighted.mean(unlist(y), na.rm = na.rm)) )
-      nms = names(err)
-      err = as.data.frame(t(as.data.frame(err)))
-      rownames(err) = nms
-    }
-    if (level <= 0) {
-      err = data.frame(
-        mean = sapply(err, mean), 
-        sd = sapply(err, sd),
-        median = sapply(err, median),
-        IQR = sapply(err, IQR))
-    }
-  }
-  return(err)
+    return(err)
 }
 
 #' @rdname summary.sperrorest
@@ -124,16 +124,16 @@ summary.sperroresterror = function(object, level = 0, pooled = TRUE, na.rm = TRU
 #' @export
 summary.sperrorestpoolederror = function(object, level = 0, na.rm = TRUE, ...)
 {
-  class(object) = NULL
-  object = as.data.frame(object)
-  if (level <= 0) {
-    object = data.frame(
-      mean = sapply(object, mean), 
-      sd = sapply(object, sd),
-      median = sapply(object, median),
-      IQR = sapply(object, IQR))
-  }
-  return(object)
+    class(object) = NULL
+    object = as.data.frame(object)
+    if (level <= 0) {
+        object = data.frame(
+            mean = sapply(object, mean), 
+            sd = sapply(object, sd),
+            median = sapply(object, median),
+            IQR = sapply(object, IQR))
+    }
+    return(object)
 }
 
 #' Summarize variable importance statistics obtained by \code{sperrorest}
@@ -148,32 +148,32 @@ summary.sperrorestpoolederror = function(object, level = 0, na.rm = TRUE, ...)
 #' @export
 summary.sperrorestimportance = function(object, level = 0, na.rm = TRUE, which = NULL, ...)
 {
-  arrdim = c( length(object), length(object[[1]]), dim(object[[1]][[1]]) )
-  arrdimnames = list( names(object), names(object[[1]]),
-                      rownames(object[[1]][[1]]), colnames(object[[1]][[1]]) )
-  arr = array( NA, dim = arrdim, dimnames = arrdimnames )
-  for (i in 1:length(object))
-    for (j in 1:length(object[[i]]))
-      arr[i,j,,] = as.matrix(object[[i]][[j]])
-  if (level <= 1)
-    arr = apply(arr, c(1,3,4), mean, na.rm = na.rm)
-  if (level <= 0) {
-    if (is.null(which)) {
-      arr = data.frame(
-        mean = apply(arr, c(2,3), mean, na.rm = na.rm),
-        sd = apply(arr, c(2,3), sd, na.rm = na.rm),
-        median = apply(arr, c(2,3), median, na.rm = na.rm),
-        IQR = apply(arr, c(2,3), IQR, na.rm = na.rm) )
-    } else {
-      arr = arr[ , , which ]
-      arr = data.frame(
-        mean = apply(arr, 2, mean, na.rm = na.rm),
-        sd = apply(arr, 2, sd, na.rm = na.rm),
-        median = apply(arr, 2, median, na.rm = na.rm),
-        IQR = apply(arr, 2, IQR, na.rm = na.rm) )
-    }
-  }            
-  return(arr)
+    arrdim = c( length(object), length(object[[1]]), dim(object[[1]][[1]]) )
+    arrdimnames = list( names(object), names(object[[1]]),
+            rownames(object[[1]][[1]]), colnames(object[[1]][[1]]) )
+    arr = array( NA, dim = arrdim, dimnames = arrdimnames )
+    for (i in 1:length(object))
+        for (j in 1:length(object[[i]]))
+            arr[i,j,,] = as.matrix(object[[i]][[j]])
+    if (level <= 1)
+        arr = apply(arr, c(1,3,4), mean, na.rm = na.rm)
+    if (level <= 0) {
+        if (is.null(which)) {
+            arr = data.frame(
+                mean = apply(arr, c(2,3), mean, na.rm = na.rm),
+                sd = apply(arr, c(2,3), sd, na.rm = na.rm),
+                median = apply(arr, c(2,3), median, na.rm = na.rm),
+                IQR = apply(arr, c(2,3), IQR, na.rm = na.rm) )
+        } else {
+            arr = arr[ , , which ]
+            arr = data.frame(
+                mean = apply(arr, 2, mean, na.rm = na.rm),
+                sd = apply(arr, 2, sd, na.rm = na.rm),
+                median = apply(arr, 2, median, na.rm = na.rm),
+                IQR = apply(arr, 2, IQR, na.rm = na.rm) )
+        }
+    }            
+    return(arr)
 }
 
 
@@ -193,37 +193,37 @@ summary.sperrorestimportance = function(object, level = 0, na.rm = TRUE, which =
 #' @export
 resample.strat.uniform = function(data, param = list( strat = "class", nstrat = Inf, replace = FALSE ))
 {
-  # Old version:
-  if (!is.null(param$response)) {
-    warning("'param$response' argument in 'resample.strat.uniform' renamed to 'strat';\n modify your code accordingly")
-    if (is.null(param$strat)) param$strat = param$response
-  }
-  
-  # Use defaults if not specified:
-  if (is.null(param$strat))    param$strat = "class"
-  if (is.null(param$nstrat))   param$nstrat = Inf
-  if (is.null(param$replace))  param$replace = FALSE
-  
-  stopifnot( (length(param$strat) == 1) | (length(param$strat) == nrow(data)) )
-  if (length(param$strat == 1)) {
-    strat = data[,param$strat]
-  } else strat = param$strat
-  if (!is.factor(strat))
-    stop("'strat' must either be a vector of factor type, or the name of a factor variable in 'data'")
-  # Each factor level must have at least one sample, otherwise sampling within this level is impossible:
-  minstrat = min(tapply(strat, strat, length))
-  stopifnot(minstrat >= 1)
-  # might want to change this to a warning.???
-  
-  if (!param$replace) param$nstrat = min(param$nstrat, minstrat)
-  
-  # Uniform sampling within each stratum:
-  sel = c()
-  for (lev in levels(strat)) {
-    wh = sample( which(strat == lev), size = param$nstrat, replace = param$replace )
-    sel = c(sel, wh)
-  }
-  return(data[sel,])
+    # Old version:
+    if (!is.null(param$response)) {
+        warning("'param$response' argument in 'resample.strat.uniform' renamed to 'strat';\n modify your code accordingly")
+        if (is.null(param$strat)) param$strat = param$response
+    }
+
+    # Use defaults if not specified:
+    if (is.null(param$strat))    param$strat = "class"
+    if (is.null(param$nstrat))   param$nstrat = Inf
+    if (is.null(param$replace))  param$replace = FALSE
+    
+    stopifnot( (length(param$strat) == 1) | (length(param$strat) == nrow(data)) )
+    if (length(param$strat == 1)) {
+        strat = data[,param$strat]
+    } else strat = param$strat
+    if (!is.factor(strat))
+        stop("'strat' must either be a vector of factor type, or the name of a factor variable in 'data'")
+    # Each factor level must have at least one sample, otherwise sampling within this level is impossible:
+    minstrat = min(tapply(strat, strat, length))
+    stopifnot(minstrat >= 1)
+    # might want to change this to a warning.???
+
+    if (!param$replace) param$nstrat = min(param$nstrat, minstrat)
+
+    # Uniform sampling within each stratum:
+    sel = c()
+    for (lev in levels(strat)) {
+        wh = sample( which(strat == lev), size = param$nstrat, replace = param$replace )
+        sel = c(sel, wh)
+    }
+    return(data[sel,])
 }
 # To do: allow nstrat to be a named vector
 
@@ -244,16 +244,16 @@ resample.strat.uniform = function(data, param = list( strat = "class", nstrat = 
 #' @export
 resample.uniform = function(data, param = list(n = Inf, replace = FALSE))
 {
-  # Apply defaults if missing from parameter list:
-  if (is.null(param$n)) param$n = Inf
-  if (is.null(param$replace)) param$replace = FALSE
-  
-  if (!param$replace) param$n = min( param$n, nrow(data) )
-  
-  # Uniform sampling with or without replacement:
-  sel = sample(nrow(data), size = param$n, replace = param$replace)
-  
-  return( data[ sel, ] )
+    # Apply defaults if missing from parameter list:
+    if (is.null(param$n)) param$n = Inf
+    if (is.null(param$replace)) param$replace = FALSE
+    
+    if (!param$replace) param$n = min( param$n, nrow(data) )
+
+    # Uniform sampling with or without replacement:
+    sel = sample(nrow(data), size = param$n, replace = param$replace)
+    
+    return( data[ sel, ] )
 }
 
 
@@ -396,355 +396,316 @@ resample.factor <- function (data, param = list(fac = "class", n = Inf, replace 
 #'      ylab = "Area under the ROC curve")
 #' @export
 sperrorest = function(formula, data, coords = c("x", "y"),
-                      model.fun, model.args = list(),
-                      pred.fun = NULL, pred.args = list(),
-                      smp.fun = partition.loo, smp.args = list(),
-                      train.fun = NULL, train.param = NULL,
-                      test.fun = NULL, test.param = NULL,
-                      err.fun = err.default,
-                      err.unpooled = importance,
-                      err.pooled = TRUE,
-                      err.train = TRUE,
-                      imp.variables = NULL,
-                      imp.permutations = 1000,
-                      importance = !is.null(imp.variables),
-                      distance = FALSE,
-                      do.gc = 1,
-                      do.try = FALSE,
-                      silent = FALSE, ...)
+    model.fun, model.args = list(),
+    pred.fun = NULL, pred.args = list(),
+    smp.fun = partition.loo, smp.args = list(),
+    train.fun = NULL, train.param = NULL,
+    test.fun = NULL, test.param = NULL,
+    err.fun = err.default,
+    err.unpooled = importance,
+    err.pooled = TRUE,
+    err.train = TRUE,
+    imp.variables = NULL,
+    imp.permutations = 1000,
+    importance = !is.null(imp.variables),
+    distance = FALSE,
+    do.gc = 1,
+    do.try = FALSE,
+    silent = FALSE, ...)
 {
-  # Some checks:
-  if (missing(model.fun)) stop("'model.fun' is a required argument")
-  if (as.character(attr(terms(formula),"variables"))[3] == "...")
-    stop("formula of the form lhs ~ ... not accepted by 'sperrorest'\nspecify all predictor variables explicitly")
-  stopifnot(is.function(model.fun))
-  stopifnot(is.function(smp.fun))
-  if (!is.null(train.fun)) stopifnot(is.function(train.fun))
-  if (!is.null(test.fun)) stopifnot(is.function(test.fun))
-  stopifnot(is.function(err.fun))
-  if (importance) {
-    if (!err.unpooled) {
-      warning("'importance=TRUE' currently only supported with 'err.unpooled=TRUE'.\nUsing 'importance=FALSE'")
-      importance = FALSE
+    # Some checks:
+    if (missing(model.fun)) stop("'model.fun' is a required argument")
+    if (as.character(attr(terms(formula),"variables"))[3] == "...")
+        stop("formula of the form lhs ~ ... not accepted by 'sperrorest'\nspecify all predictor variables explicitly")
+    stopifnot(is.function(model.fun))
+    stopifnot(is.function(smp.fun))
+    if (!is.null(train.fun)) stopifnot(is.function(train.fun))
+    if (!is.null(test.fun)) stopifnot(is.function(test.fun))
+    stopifnot(is.function(err.fun))
+    if (importance) {
+        if (!err.unpooled) {
+            warning("'importance=TRUE' currently only supported with 'err.unpooled=TRUE'.\nUsing 'importance=FALSE'")
+            importance = FALSE
+        }
+        stopifnot(is.numeric(imp.permutations))
+        if (!is.null(imp.variables)) stopifnot(is.character(imp.variables))
     }
-    stopifnot(is.numeric(imp.permutations))
-    if (!is.null(imp.variables)) stopifnot(is.character(imp.variables))
-  }
-  stopifnot(is.character(coords))
-  stopifnot(length(coords) == 2)
-  if (importance & !err.unpooled)
-    stop("variable importance assessment currently only supported at the unpooled level")
-  
-  # Check if user is trying to bypass the normal mechanism for generating training and test data sets 
-  # and for passing formulas:
-  if (any(names(model.args) == "formula")) stop("'model.args' cannot have a 'formula' element")
-  if (any(names(model.args) == "data")) stop("'model.args' cannot have a 'data' element")
-  if (any(names(pred.args) == "object")) stop("'pred.args' cannot have an 'object' element:\nthis will be generated by 'sperrorest'")
-  if (any(names(pred.args) == "newdata")) stop("'pred.args' cannot have a 'newdata' element:\nthis will be generated by 'sperrorest'")
-  
-  # Some checks related to recent changes in argument names:
-  dots.args = list(...)
-  if (length(dots.args) > 0) {
-    if (any(names(dots.args) == "predfun")) stop("sorry: argument names have changed; 'predfun' is now 'pred.fun'")
-    if (any(names(dots.args) == "model")) stop("sorry: argument names have changed; 'model' is now 'model.fun'")
-    if (any(names(dots.args) == "err.combined")) stop("sorry: argument names have changed; 'err.combined' is now 'err.pooled'")
-    if (any(names(dots.args) == "err.uncombined")) stop("sorry: argument names have changed; 'err.uncombined' is now 'err.unpooled'")
-    warning("'...' arguments currently not supported:\nuse 'model.args' to pass list of additional arguments to 'model.fun'")
-  }
-  
-  # Name of response variable:
-  response = as.character(attr(terms(formula),"variables"))[2]
-  
-  smp.args$data = data
-  smp.args$coords = coords
-  
-  resamp = do.call(smp.fun, args = smp.args)
-  if (distance)
-    # Parallelize this function???
-    resamp = add.distance(resamp, data, coords = coords, fun = mean)
-  
-  if (err.unpooled) {
-    res = lapply(resamp, unclass)
-    class(res) = "sperroresterror"
-  } else res = NULL
-  pooled.err = NULL
-  # required to be able to assign levels to predictions if appropriate:
-  is.factor.prediction = NULL
-  
-  ### Permutation-based variable importance assessment (optional):
-  impo = NULL
-  if (importance) {
-    # Importance of which variables:
-    if (is.null(imp.variables))
-      imp.variables = strsplit(as.character(formula)[3]," + ",fixed=TRUE)[[1]]
-    # Dummy data structure that will later be populated with the results:
-    impo = resamp
-    # Create a template that will contain results of variable importance assessment:
-    imp.one.rep = as.list( rep(NA, length(imp.variables)) )
-    names(imp.one.rep) = imp.variables
-    tmp = as.list(rep(NA, imp.permutations))
-    names(tmp) = as.character(1:imp.permutations)
-    for (vnm in imp.variables) imp.one.rep[[vnm]] = tmp
-    rm(tmp)
-  }
-  
-  #message to make sure local source files are being used
-  print("This is not the original sperrorest package code.")
-  
-  #runreps function for lapply()
-  runreps = function(currentSample){
-    #if (!silent) cat(date(), "Repetition", names(resamp)[i], "\n")
-    #output data structures
-    currentRes = NULL
-    currentImpo = NULL
-    currentPooled.err = NULL
+    stopifnot(is.character(coords))
+    stopifnot(length(coords) == 2)
+    if (importance & !err.unpooled)
+        stop("variable importance assessment currently only supported at the unpooled level")
+
+    # Check if user is trying to bypass the normal mechanism for generating training and test data sets 
+    # and for passing formulas:
+    if (any(names(model.args) == "formula")) stop("'model.args' cannot have a 'formula' element")
+    if (any(names(model.args) == "data")) stop("'model.args' cannot have a 'data' element")
+    if (any(names(pred.args) == "object")) stop("'pred.args' cannot have an 'object' element:\nthis will be generated by 'sperrorest'")
+    if (any(names(pred.args) == "newdata")) stop("'pred.args' cannot have a 'newdata' element:\nthis will be generated by 'sperrorest'")
+
+    # Some checks related to recent changes in argument names:
+    dots.args = list(...)
+    if (length(dots.args) > 0) {
+        if (any(names(dots.args) == "predfun")) stop("sorry: argument names have changed; 'predfun' is now 'pred.fun'")
+        if (any(names(dots.args) == "model")) stop("sorry: argument names have changed; 'model' is now 'model.fun'")
+        if (any(names(dots.args) == "err.combined")) stop("sorry: argument names have changed; 'err.combined' is now 'err.pooled'")
+        if (any(names(dots.args) == "err.uncombined")) stop("sorry: argument names have changed; 'err.uncombined' is now 'err.unpooled'")
+        warning("'...' arguments currently not supported:\nuse 'model.args' to pass list of additional arguments to 'model.fun'")
+    }
+
+    # Name of response variable:
+    response = as.character(attr(terms(formula),"variables"))[2]
     
+    smp.args$data = data
+    smp.args$coords = coords
+
+    resamp = do.call(smp.fun, args = smp.args)
+    if (distance)
+        # Parallelize this function???
+        resamp = add.distance(resamp, data, coords = coords, fun = mean)
+
     if (err.unpooled) {
-      currentRes = lapply(currentSample, unclass)
-      class(currentRes) = "sperroresterror"
-    } else currentRes = NULL
+        res = lapply(resamp, unclass)
+        class(res) = "sperroresterror"
+    } else res = NULL
+    pooled.err = NULL
+    # required to be able to assign levels to predictions if appropriate:
+    is.factor.prediction = NULL
+
+    ### Permutation-based variable importance assessment (optional):
+    impo = NULL
+    if (importance) {
+        # Importance of which variables:
+        if (is.null(imp.variables))
+            imp.variables = strsplit(as.character(formula)[3]," + ",fixed=TRUE)[[1]]
+        # Dummy data structure that will later be populated with the results:
+        impo = resamp
+        # Create a template that will contain results of variable importance assessment:
+        imp.one.rep = as.list( rep(NA, length(imp.variables)) )
+        names(imp.one.rep) = imp.variables
+        tmp = as.list(rep(NA, imp.permutations))
+        names(tmp) = as.character(1:imp.permutations)
+        for (vnm in imp.variables) imp.one.rep[[vnm]] = tmp
+        rm(tmp)
+    }
     
-    # Collect pooled results in these data structures:
-    if (err.train) pooled.obs.train = pooled.pred.train = c()
-    pooled.obs.test = pooled.pred.test = c()
-    
-    # Parallelize this???
-    # For each fold:
-    for (j in 1:length(currentSample))
-    {
-      if (!silent) cat(date(), "- Fold", j, "\n")
-      
-      # Create training sample:
-      nd = data[ currentSample[[j]]$train , ]
-      if (!is.null(train.fun))
-        nd = train.fun(data = nd, param = train.param)
+    print("This is the sperrorest backup script running!")
+    #print(res)
+
+    # For each repetition:
+    for (i in 1:length(resamp)) {
+        if (!silent) cat(date(), "Repetition", names(resamp)[i], "\n")
+
+        # Collect pooled results in these data structures:
+        if (err.train) pooled.obs.train = pooled.pred.train = c()
+        pooled.obs.test = pooled.pred.test = c()
+
+        # Parallelize this???
+        # For each fold:
+        for (j in 1:length(resamp[[i]]))
+        {
+            if (!silent) cat(date(), "- Fold", j, "\n")
             
-      # Train model on training sample:
-      margs = c( list(formula = formula, data = nd), model.args )
-      
-      if (do.try) {
-        fit = try(do.call(model.fun, args = margs), silent = silent)
-        
-        # Error handling:
-        if (class(fit) == "try-error") {
-          fit = NULL
-          if (err.unpooled) {
-            if (err.train) currentRes[[j]]$train = NULL #res[[i]][[j]]$train = NULL
-            currentRes[[j]]$test = NULL #res[[i]][[j]]$test = 
-            if (importance) currentImpo[[j]] = c() # ???
-          }
-          if (do.gc >= 2) gc()
-          next # skip this fold
-        }
-        
-      } else {
-        fit = do.call(model.fun, args = margs)
-      }
+            # Create training sample:
+            nd = data[ resamp[[i]][[j]]$train , ]
+            if (!is.null(train.fun))
+                nd = train.fun(data = nd, param = train.param)
+
+            # Train model on training sample:
+            margs = c( list(formula = formula, data = nd), model.args )
             
-      if (err.train) {
-        # Apply model to training sample:
-        pargs = c( list(object = fit, newdata = nd), pred.args )
-        if (is.null(pred.fun)) {
-          pred.train = do.call(predict, args = pargs)
-        } else {
-          pred.train = do.call(pred.fun, args = pargs)
-        }
-        rm(pargs)
-        
-        # Calculate error measures on training sample:
-        if (err.unpooled)
-          if (do.try) {
-            err.try = try(err.fun(nd[,response], pred.train), silent = silent)
-            if (class(err.try) == "try-error") err.try = NULL # ???
-            currentRes[[j]]$train = err.try #res[[i]][[j]]$train = err.try
-          } else {
-            currentRes[[j]]$train = err.fun(nd[,response], pred.train) #res[[i]][[j]]$train = err.fun(nd[,response], pred.train)
-          }
-        if (err.pooled) {
-          pooled.obs.train = c( pooled.obs.train, nd[,response] )
-          pooled.pred.train = c( pooled.pred.train, pred.train )
-        }
-      } else {
-        if (err.unpooled) currentRes[[j]]$train = NULL #res[[i]][[j]]$train = NULL
-      }
-      
-      # Create test sample:
-      nd = data[ currentSample[[j]]$test , ]
-      if (!is.null(test.fun))
-        nd = test.fun(data = nd, param = test.param)
-      # Create a 'backup' copy for variable importance assessment:
-      if (importance) nd.bak = nd
-      # Apply model to test sample:
-      pargs = c( list(object = fit, newdata = nd), pred.args )
-      if (is.null(pred.fun)) {
-        pred.test  = do.call(predict, args = pargs)
-      } else {
-        pred.test  = do.call(pred.fun, args = pargs)
-      }
-      rm(pargs)
-      
-      # Calculate error measures on test sample:
-      if (err.unpooled) {
-        if (do.try) {
-          err.try = try(err.fun(nd[,response], pred.test), silent = silent)
-          if (class(err.try) == "try-error") err.try = NULL # ???
-          currentRes[[j]]$test = err.try #res[[i]][[j]]$test = err.try
-        } else {
-          currentRes[[j]]$test = err.fun(nd[,response], pred.test) #res[[i]][[j]]$test  = err.fun(nd[,response], pred.test)
-        }
-      }
-      if (err.pooled) {
-        pooled.obs.test = c( pooled.obs.test, nd[,response] )
-        pooled.pred.test = c( pooled.pred.test, pred.test )
-        is.factor.prediction = is.factor(pred.test)
-      }
-      
-      ### Permutation-based variable importance assessment:
-      if (importance & err.unpooled) {
-        
-        #if (is.null(res[[i]][[j]]$test)) {
-        if(is.null(currentRes[[j]]$test)){
-          currentImpo[[j]] = c()
-          if (!silent) cat(date(), "-- skipping variable importance\n")
-        } else {
-          
-          if (!silent) cat(date(), "-- Variable importance\n")
-          imp.temp = imp.one.rep
-          
-          # Parallelize this: ???
-          for (cnt in 1:imp.permutations) {
-            # Some output on screen:
-            if (!silent & (cnt>1))
-              if (log10(cnt)==floor(log10(cnt))) 
-                cat(date(), "   ", cnt, "\n")
+            if (do.try) {
+                fit = try(do.call(model.fun, args = margs), silent = silent)
             
-            # Permutation indices:
-            permut = sample(1:nrow(nd), replace = FALSE)
-            
-            # For each variable:
-            for (vnm in imp.variables) {
-              # Get undisturbed backup copy of test sample:
-              nd = nd.bak
-              # Permute variable vnm:
-              nd[,vnm] = nd[,vnm][permut]
-              # Apply model to perturbed test sample:
-              pargs = c( list(object = fit, newdata = nd), pred.args )
-              if (is.null(pred.fun)) {
-                pred.test  = do.call(predict, args = pargs)
-              } else {
-                pred.test  = do.call(pred.fun, args = pargs)
-              }
-              rm(pargs)
-              
-              # Calculate variable importance:
-              if (do.try) {
-                permut.err = try(err.fun(nd[,response], pred.test), silent = silent)
-                if (class(permut.err) == "try-error") {
-                  imp.temp[[vnm]][[cnt]] = c() # ???
-                } else {
-                  imp.temp[[vnm]][[cnt]] = 
-                    as.list( unlist(currentRes[[j]]$test) - unlist(permut.err) )
-                  #as.list( unlist(res[[i]][[j]]$test) - unlist(permut.err) )
-                  # (apply '-' to corresponding list elements; only works
-                  # if all list elements are scalars)
+                # Error handling:
+                if (class(fit) == "try-error") {
+                    fit = NULL
+                    if (err.unpooled) {
+                        if (err.train) res[[i]][[j]]$train = NULL
+                        res[[i]][[j]]$test = NULL
+                        if (importance) impo[[i]][[j]] = c() # ???
+                    }
+                    if (do.gc >= 2) gc()
+                    next # skip this fold
                 }
-              } else {
-                permut.err = err.fun(nd[,response], pred.test)
-                imp.temp[[vnm]][[cnt]] = 
-                  as.list( unlist(currentRes[[j]]$test) - unlist(permut.err) )
-                #as.list( unlist(res[[i]][[j]]$test) - unlist(permut.err) )
-                # (apply '-' to corresponding list elements; only works
-                # if all list elements are scalars)
-              }
+                
+            } else {
+                fit = do.call(model.fun, args = margs)
             }
-          }
-          # average the results obtained in each permutation:
-          currentImpo[[j]] = as.data.frame(
-            t(sapply(imp.temp, 
-                     function(y) sapply(as.data.frame(t(
-                       sapply( y, as.data.frame ))), 
-                       function(x) mean(unlist(x)) ))))
-          rm(nd.bak, nd) # better safe than sorry...
-        } # end of else if (!is.null(res[[i]][[j]]$test))
-      }
-      
-    }
+
+            if (err.train) {
+                # Apply model to training sample:
+                pargs = c( list(object = fit, newdata = nd), pred.args )
+                if (is.null(pred.fun)) {
+                    pred.train = do.call(predict, args = pargs)
+                } else {
+                    pred.train = do.call(pred.fun, args = pargs)
+                }
+                rm(pargs)
+            
+                # Calculate error measures on training sample:
+                if (err.unpooled)
+                    if (do.try) {
+                        err.try = try(err.fun(nd[,response], pred.train), silent = silent)
+                        if (class(err.try) == "try-error") err.try = NULL # ???
+                        res[[i]][[j]]$train = err.try
+                    } else {
+                        res[[i]][[j]]$train = err.fun(nd[,response], pred.train)
+                    }
+                if (err.pooled) {
+                    pooled.obs.train = c( pooled.obs.train, nd[,response] )
+                    pooled.pred.train = c( pooled.pred.train, pred.train )
+                }
+            } else {
+                if (err.unpooled) res[[i]][[j]]$train = NULL
+            }
+            
+            # Create test sample:
+            nd = data[ resamp[[i]][[j]]$test , ]
+            if (!is.null(test.fun))
+                nd = test.fun(data = nd, param = test.param)
+            # Create a 'backup' copy for variable importance assessment:
+            if (importance) nd.bak = nd
+            # Apply model to test sample:
+            pargs = c( list(object = fit, newdata = nd), pred.args )
+            if (is.null(pred.fun)) {
+                pred.test  = do.call(predict, args = pargs)
+            } else {
+                pred.test  = do.call(pred.fun, args = pargs)
+            }
+            rm(pargs)
+            
+            # Calculate error measures on test sample:
+            if (err.unpooled) {
+                if (do.try) {
+                    err.try = try(err.fun(nd[,response], pred.test), silent = silent)
+                    if (class(err.try) == "try-error") err.try = NULL # ???
+                    res[[i]][[j]]$test = err.try
+                } else {
+                    res[[i]][[j]]$test  = err.fun(nd[,response], pred.test)
+                }
+            }
+            if (err.pooled) {
+                pooled.obs.test = c( pooled.obs.test, nd[,response] )
+                pooled.pred.test = c( pooled.pred.test, pred.test )
+                is.factor.prediction = is.factor(pred.test)
+            }
+            
+            ### Permutation-based variable importance assessment:
+            if (importance & err.unpooled) {
+            
+                if (is.null(res[[i]][[j]]$test)) {
+                    impo[[i]][[j]] = c()
+                    if (!silent) cat(date(), "-- skipping variable importance\n")
+                } else {
+
+                    if (!silent) cat(date(), "-- Variable importance\n")
+                    imp.temp = imp.one.rep
     
-    # Put the results from the pooled estimation into the pooled.err data structure:
-    if (err.pooled) {
-      if (is.factor(data[,response])) {
-        lev = levels(data[,response])
-        if (err.train) pooled.obs.train = factor(lev[pooled.obs.train], levels = lev)
-        pooled.obs.test = factor(lev[pooled.obs.test], levels = lev)
-        if (is.factor.prediction) {
-          if (err.train) pooled.pred.train = factor(lev[pooled.pred.train], levels = lev)
-          pooled.pred.test = factor(lev[pooled.pred.test], levels = lev)
+                    # Parallelize this: ???
+                    for (cnt in 1:imp.permutations) {
+                        # Some output on screen:
+                        if (!silent & (cnt>1))
+                            if (log10(cnt)==floor(log10(cnt))) 
+                                cat(date(), "   ", cnt, "\n")
+    
+                        # Permutation indices:
+                        permut = sample(1:nrow(nd), replace = FALSE)
+    
+                        # For each variable:
+                        for (vnm in imp.variables) {
+                            # Get undisturbed backup copy of test sample:
+                            nd = nd.bak
+                            # Permute variable vnm:
+                            nd[,vnm] = nd[,vnm][permut]
+                            # Apply model to perturbed test sample:
+                            pargs = c( list(object = fit, newdata = nd), pred.args )
+                            if (is.null(pred.fun)) {
+                                pred.test  = do.call(predict, args = pargs)
+                            } else {
+                                pred.test  = do.call(pred.fun, args = pargs)
+                            }
+                            rm(pargs)
+                            
+                            # Calculate variable importance:
+                            if (do.try) {
+                                permut.err = try(err.fun(nd[,response], pred.test), silent = silent)
+                                if (class(permut.err) == "try-error") {
+                                    imp.temp[[vnm]][[cnt]] = c() # ???
+                                } else {
+                                    imp.temp[[vnm]][[cnt]] = 
+                                        as.list( unlist(res[[i]][[j]]$test) - unlist(permut.err) )
+                                        # (apply '-' to corresponding list elements; only works
+                                        # if all list elements are scalars)
+                                }
+                            } else {
+                                permut.err = err.fun(nd[,response], pred.test)
+                                imp.temp[[vnm]][[cnt]] = 
+                                    as.list( unlist(res[[i]][[j]]$test) - unlist(permut.err) )
+                                    # (apply '-' to corresponding list elements; only works
+                                    # if all list elements are scalars)
+                            }
+                        }
+                    }
+                    # average the results obtained in each permutation:
+                    impo[[i]][[j]] = as.data.frame(
+                        t(sapply(imp.temp, 
+                            function(y) sapply(as.data.frame(t(
+                                sapply( y, as.data.frame ))), 
+                                    function(x) mean(unlist(x)) ))))
+                    rm(nd.bak, nd) # better safe than sorry...
+                } # end of else if (!is.null(res[[i]][[j]]$test))
+            }
+            
+        } # end for each fold
+        
+        # Put the results from the pooled estimation into the pooled.err data structure:
+        if (err.pooled) {
+            if (is.factor(data[,response])) {
+                lev = levels(data[,response])
+                if (err.train) pooled.obs.train = factor(lev[pooled.obs.train], levels = lev)
+                pooled.obs.test = factor(lev[pooled.obs.test], levels = lev)
+                if (is.factor.prediction) {
+                    if (err.train) pooled.pred.train = factor(lev[pooled.pred.train], levels = lev)
+                    pooled.pred.test = factor(lev[pooled.pred.test], levels = lev)
+                }
+            }
+            pooled.err.train = NULL
+            if (err.train)
+                pooled.err.train = err.fun( pooled.obs.train, pooled.pred.train )
+            if (i == 1) {
+                pooled.err = t(unlist( list( train = pooled.err.train,
+                                           test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ))
+            } else {
+                pooled.err = rbind( pooled.err, 
+                             unlist( list( train = pooled.err.train,
+                                           test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ) )
+            }
+            
+            if (do.gc >= 2) gc()
         }
-      }
-      pooled.err.train = NULL
-      if (err.train)
-        pooled.err.train = err.fun( pooled.obs.train, pooled.pred.train )
-      
-      currentPooled.err = t(unlist( list( train = pooled.err.train,
-                                          test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ))
-      
-      #if (i == 1) {
-      #  pooled.err = t(unlist( list( train = pooled.err.train,
-      #                               test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ))
-      #} else {
-      #  pooled.err = rbind( pooled.err, 
-      #                      unlist( list( train = pooled.err.train,
-      #                                    test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ) )
-      #}
-      
-      if (do.gc >= 2) gc()
-    } # end for each fold
-    
-    if ((do.gc >= 1) & (do.gc < 2)) gc()
-    return(list(error = currentRes, pooled.error = currentPooled.err, importance = currentImpo))
-  }
-  
-  # For each repetition:
-  myRes = lapply(FUN = runreps,resamp)
-  #   for(myI in 1:length(resamp)){
-  #     runreps(resamp[[myI]])
-  #   }
-  #print(myRes)
-  
-  #transfer results of lapply() to respective data objects
-  for(i in 1:length(myRes)){
-    if (i == 1) {
-      pooled.err = myRes[[i]]$pooled.error
-      impo[[i]] = myRes[[i]]$importance
-      res[[i]] = myRes[[i]]$error
-    } else {
-      pooled.err = rbind( pooled.err, myRes[[i]]$pooled.error )
-      impo[[i]] = myRes[[i]]$importance
-      res[[i]] = myRes[[i]]$error
-      #impo = rbind( impo, myRes[[i]]$importance )
-      #res = rbind( res, myRes[[i]]$error )
+        
+        if ((do.gc >= 1) & (do.gc < 2)) gc()
+    } # end for each repetition
+
+    # convert matrix(?) to data.frame:
+    if (err.pooled) {
+        pooled.err = as.data.frame(pooled.err)
+        rownames(pooled.err) = NULL
+        class(pooled.err) = "sperrorestpoolederror"
     }
-  }
-  
-  # convert matrix(?) to data.frame:
-  if (err.pooled) {
-    pooled.err = as.data.frame(pooled.err)
-    rownames(pooled.err) = NULL
-    class(pooled.err) = "sperrorestpoolederror"
-  }
-  
-  if (!silent) cat(date(), "Done.\n")
-  
-  if (importance) class(impo) = "sperrorestimportance"
-  
-  RES = list(
-    error = res, 
-    represampling = resamp, 
-    pooled.error = pooled.err,
-    importance = impo )
-  class(RES) = "sperrorest"
-  
-  return( RES )
+    
+    if (!silent) cat(date(), "Done.\n")
+
+    if (importance) class(impo) = "sperrorestimportance"
+    
+    RES = list(
+        error = res, 
+        represampling = resamp, 
+        pooled.error = pooled.err,
+        importance = impo )
+    class(RES) = "sperrorest"
+    
+    return( RES )
 }
 
 #' Summary and print methods for sperrorest results
@@ -759,11 +720,11 @@ sperrorest = function(formula, data, coords = c("x", "y"),
 #' \code{\link{summary.sperroresterror}}, \code{\link{summary.sperrorestimportance}}
 #' @export
 summary.sperrorest = function(object, ...) {
-  list(
-    error = summary(object$error, ...),
-    represampling = summary(object$represampling, ...),
-    pooled.error = summary(object$pooled.error, ...),
-    importance = summary(object$importance, ...) )
+    list(
+        error = summary(object$error, ...),
+        represampling = summary(object$represampling, ...),
+        pooled.error = summary(object$pooled.error, ...),
+        importance = summary(object$importance, ...) )
 }
 
 #' @rdname summary.sperrorest
