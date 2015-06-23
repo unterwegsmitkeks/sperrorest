@@ -36,6 +36,7 @@
 #' @param do.gc numeric (default: 1): defines frequency of memory garbage collection by calling \code{\link{gc}}; if \code{<1}, no garbage collection; if \code{>=1}, run a \code{gc()} after each repetition; if \code{>=2}, after each fold
 #' @param do.try logical (default: \code{FALSE}): if \code{TRUE} [untested!!], use \code{\link{try}} to robustify calls to \code{model.fun} and \code{err.fun}; use with caution!
 #' @param silent If \code{TRUE}, show progress on console (in Windows Rgui, disable 'Buffered output' in 'Misc' menu)
+#' @param par.args Contains parallelization parameters \code(par.mode) (the method used for parallelization) and \code(par.units) (the number of parallel processing units)
 #' @return A list (object of class \code{sperrorest}) with (up to) four components:
 #' \item{error}{a \code{sperroresterror} object containing predictive performances at the fold level}
 #' \item{represampling}{a \code{\link{represampling}} object}
@@ -96,23 +97,23 @@
 #'      ylab = "Area under the ROC curve")
 #' @export
 parsperrorest = function(formula, data, coords = c("x", "y"),
-                      model.fun, model.args = list(),
-                      pred.fun = NULL, pred.args = list(),
-                      smp.fun = partition.loo, smp.args = list(),
-                      train.fun = NULL, train.param = NULL,
-                      test.fun = NULL, test.param = NULL,
-                      err.fun = err.default,
-                      err.unpooled = importance,
-                      err.pooled = TRUE,
-                      err.train = TRUE,
-                      imp.variables = NULL,
-                      imp.permutations = 1000,
-                      importance = !is.null(imp.variables),
-                      distance = FALSE,
-                      do.gc = 1,
-                      do.try = FALSE,
-                      silent = FALSE,
-                      mc.cores = detectCores(), ...)
+                         model.fun, model.args = list(),
+                         pred.fun = NULL, pred.args = list(),
+                         smp.fun = partition.loo, smp.args = list(),
+                         train.fun = NULL, train.param = NULL,
+                         test.fun = NULL, test.param = NULL,
+                         err.fun = err.default,
+                         err.unpooled = importance,
+                         err.pooled = TRUE,
+                         err.train = TRUE,
+                         imp.variables = NULL,
+                         imp.permutations = 1000,
+                         importance = !is.null(imp.variables),
+                         distance = FALSE,
+                         do.gc = 1,
+                         do.try = FALSE,
+                         silent = FALSE,
+                         par.args = list(), ...)
 {
   # Some checks:
   if (missing(model.fun)) stop("'model.fun' is a required argument")
@@ -190,7 +191,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
   }
   
   #message to make sure local source files are being used
-  print("This is not the original sperrorest package code.")
+  print("This is the parallel sperrorest code.")
   
   #runreps function for lapply()
   runreps = function(currentSample){
@@ -405,12 +406,18 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
     return(list(error = currentRes, pooled.error = currentPooled.err, importance = currentImpo))
   }
   
+  if(par.args$par.units > detectCores())
+    par.args$par.units = detectCores()
+  
   # For each repetition:
-  myRes = mclapply(resamp, FUN = runreps, mc.cores = mc.cores)
-  #   for(myI in 1:length(resamp)){
-  #     runreps(resamp[[myI]])
-  #   }
-  #print(myRes)
+  if(par.args$par.mode == 1)
+    myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units)
+  if(par.args$par.mode == 2){
+    par.cl = makeCluster(par.args$par.units, type = "SOCK")
+    force(pred.fun) #force evaluation of pred.fun, so it is serialized and provided to all cluster workers
+    myRes = parLapply(cl = par.cl, X = resamp, fun = runreps)
+    stopCluster(par.cl)
+  }
   
   #transfer results of lapply() to respective data objects
   for(i in 1:length(myRes)){
@@ -422,8 +429,6 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
       pooled.err = rbind( pooled.err, myRes[[i]]$pooled.error )
       impo[[i]] = myRes[[i]]$importance
       res[[i]] = myRes[[i]]$error
-      #impo = rbind( impo, myRes[[i]]$importance )
-      #res = rbind( res, myRes[[i]]$error )
     }
   }
   
