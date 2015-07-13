@@ -113,8 +113,12 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
                          do.gc = 1,
                          do.try = FALSE,
                          silent = FALSE,
-                         par.args = list(), ...)
+                         par.args = list(),
+                         benchmark = FALSE, ...)
 {
+  #if benchmark = TRUE, start clock
+  if(benchmark) start.time = Sys.time()
+  
   # Some checks:
   if (missing(model.fun)) stop("'model.fun' is a required argument")
   if (as.character(attr(terms(formula),"variables"))[3] == "...")
@@ -153,6 +157,9 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
     if (any(names(dots.args) == "err.uncombined")) stop("sorry: argument names have changed; 'err.uncombined' is now 'err.unpooled'")
     warning("'...' arguments currently not supported:\nuse 'model.args' to pass list of additional arguments to 'model.fun'")
   }
+  
+  #load required libraries
+  library(parallel)
   
   # Name of response variable:
   response = as.character(attr(terms(formula),"variables"))[2]
@@ -198,7 +205,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
     #if (!silent) cat(date(), "Repetition", names(resamp)[i], "\n")
     #output data structures
     currentRes = NULL
-    currentImpo = NULL
+    currentImpo = currentSample
     currentPooled.err = NULL
     
     if (err.unpooled) {
@@ -390,15 +397,6 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
       currentPooled.err = t(unlist( list( train = pooled.err.train,
                                           test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ))
       
-      #if (i == 1) {
-      #  pooled.err = t(unlist( list( train = pooled.err.train,
-      #                               test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ))
-      #} else {
-      #  pooled.err = rbind( pooled.err, 
-      #                      unlist( list( train = pooled.err.train,
-      #                                    test  = err.fun( pooled.obs.test,  pooled.pred.test ) ) ) )
-      #}
-      
       if (do.gc >= 2) gc()
     } # end for each fold
     
@@ -410,10 +408,15 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
     par.args$par.units = detectCores()
   
   # For each repetition:
-  if(par.args$par.mode == 1)
+  if(par.args$par.mode == 1){
+    RNGkind("L'Ecuyer-CMRG")
+    set.seed(1234567)
+    mc.reset.stream()
     myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units)
+  }
   if(par.args$par.mode == 2){
     par.cl = makeCluster(par.args$par.units, type = "SOCK")
+    clusterSetRNGStream(par.cl, 1234567) #set up RNG stream to obtain reproducable results
     force(pred.fun) #force evaluation of pred.fun, so it is serialized and provided to all cluster workers
     myRes = parLapply(cl = par.cl, X = resamp, fun = runreps)
     stopCluster(par.cl)
@@ -443,11 +446,19 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
   
   if (importance) class(impo) = "sperrorestimportance"
   
+  if(benchmark) runtime = Sys.time() - start.time
+  else runtime = NULL
+  
   RES = list(
     error = res, 
     represampling = resamp, 
     pooled.error = pooled.err,
-    importance = impo )
+    importance = impo,
+    benchmarks = list(system.info = Sys.info(),
+                    cpu.cores = detectCores(),
+                    par.mode = par.args$par.mode,
+                    par.units = par.args$par.units,
+                    runtime.performance = runtime))
   class(RES) = "sperrorest"
   
   return( RES )
