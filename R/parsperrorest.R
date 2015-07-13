@@ -411,12 +411,12 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
   if(par.args$par.mode == 1){
     RNGkind("L'Ecuyer-CMRG")
     set.seed(1234567)
-    mc.reset.stream()
+    mc.reset.stream() #set up RNG stream to obtain reproducible results
     myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units)
   }
   if(par.args$par.mode == 2){
     par.cl = makeCluster(par.args$par.units, type = "SOCK")
-    clusterSetRNGStream(par.cl, 1234567) #set up RNG stream to obtain reproducable results
+    clusterSetRNGStream(par.cl, 1234567) #set up RNG stream to obtain reproducible results
     force(pred.fun) #force evaluation of pred.fun, so it is serialized and provided to all cluster workers
     myRes = parLapply(cl = par.cl, X = resamp, fun = runreps)
     stopCluster(par.cl)
@@ -446,19 +446,21 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
   
   if (importance) class(impo) = "sperrorestimportance"
   
-  if(benchmark) runtime = Sys.time() - start.time
-  else runtime = NULL
+  if(benchmark){
+    my.bench = list(system.info = Sys.info(),
+                    cpu.cores = detectCores(),
+                    par.mode = par.args$par.mode,
+                    par.units = par.args$par.units,
+                    runtime.performance = Sys.time() - start.time)
+  }
+  else my.bench = NULL
   
   RES = list(
     error = res, 
     represampling = resamp, 
     pooled.error = pooled.err,
     importance = impo,
-    benchmarks = list(system.info = Sys.info(),
-                    cpu.cores = detectCores(),
-                    par.mode = par.args$par.mode,
-                    par.units = par.args$par.units,
-                    runtime.performance = runtime))
+    benchmarks = my.bench)
   class(RES) = "sperrorest"
   
   return( RES )
