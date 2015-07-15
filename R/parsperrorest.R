@@ -1,7 +1,7 @@
 #' Perform parallelized spatial error estimation and variable importance assessment
 #'
-#' \code{parsperrorest} is a flexible interface for multiple types of spatial and non-spatial cross-validation 
-#' and bootstrap error estimation and permutation-based assessment of spatial variable importance.
+#' \code{parsperrorest} is a flexible interface for multiple types of parallelized spatial and non-spatial cross-validation 
+#' and bootstrap error estimation and parallelized permutation-based assessment of spatial variable importance.
 #' @inheritParams partition.cv
 #' @param data a \code{data.frame} with predictor and response variables. Training and test samples 
 #' will be drawn from this data set by \code{train.fun} and \code{test.fun}, respectively.
@@ -36,12 +36,17 @@
 #' @param do.gc numeric (default: 1): defines frequency of memory garbage collection by calling \code{\link{gc}}; if \code{<1}, no garbage collection; if \code{>=1}, run a \code{gc()} after each repetition; if \code{>=2}, after each fold
 #' @param do.try logical (default: \code{FALSE}): if \code{TRUE} [untested!!], use \code{\link{try}} to robustify calls to \code{model.fun} and \code{err.fun}; use with caution!
 #' @param silent If \code{TRUE}, show progress on console (in Windows Rgui, disable 'Buffered output' in 'Misc' menu)
-#' @param par.args Contains parallelization parameters \code(par.mode) (the method used for parallelization) and \code(par.units) (the number of parallel processing units)
-#' @return A list (object of class \code{sperrorest}) with (up to) four components:
+#' @param par.args Contains parallelization parameters \code{par.mode} (the method used for parallelization) and \code{par.units} (the number of parallel processing units). 
+#' Setting \code{par.mode} to 1 will only work for Linux or Mac OS users, unless \code{par.units} is set to 1. 
+#' In that case the code will run on Windows machines, too. However, execution will be sequential due to only one CPU core being used. 
+#' Setting \code{par.mode} to 2 will work on all operating systems, but does not allow for individual workers to print progress to the R console (cf. \code{silent}).
+#' @param benchmark logical (default: \code{FALSE}): if \code{TRUE}, perform benchmarking and return \code{sperrorestbenchmarks} object
+#' @return A list (object of class \code{sperrorest}) with (up to) five components:
 #' \item{error}{a \code{sperroresterror} object containing predictive performances at the fold level}
 #' \item{represampling}{a \code{\link{represampling}} object}
 #' \item{pooled.error}{a \code{sperrorestpoolederror} object containing predictive performances at the repetition level}
 #' \item{importance}{a \code{sperrorestimportance} object containing permutation-based variable importances at the fold level}
+#' \item{benchmarks}{a \code{sperrorestbenchmarks} object containing information on the system the code is running on, starting and finishing times, number of available CPU cores, parallelization mode, number of parallel units, and runtime performance}
 #' @return An object of class \code{sperrorest}, i.e. a list with components \code{error} (of class \code{sperroresterror}), \code{represampling} (of class \code{represampling}), \code{pooled.error} (of class \code{sperrorestpoolederror}) and \code{importance} (of class \code{sperrorestimportance}).
 #' @note To do: (1) Parallelize the code; (2) Optionally save fitted models, training and test samples in the results object; (3) Optionally save intermediate results in some file, and enable the function to continue an interrupted sperrorest call where it was interrupted. (3) Optionally have sperrorest dump the result of each repetition into a file, and to skip repetitions for which a file already exists. (4) Save sperrorest version number in results object.
 #' @references Brenning, A. 2012. Spatial cross-validation and bootstrap for the assessment of prediction rules in remote sensing: the R package 'sperrorest'. 2012 IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 23-27 July 2012, p. 5372-5375.
@@ -70,31 +75,32 @@
 #'
 #' # Non-spatial 5-repeated 10-fold cross-validation:
 #' mypred.rpart = function(object, newdata) predict(object, newdata)[,2]
-#' nspres = sperrorest(data = ecuador, formula = fo,
+#' parnspres = parsperrorest(data = ecuador, formula = fo,
 #'     model.fun = rpart, model.args = list(control = ctrl),
 #'     pred.fun = mypred.rpart,
-#'     smp.fun = partition.cv, smp.args = list(repetition=1:5, nfold=10))
-#' summary(nspres$error)
-#' summary(nspres$represampling)
-#' plot(nspres$represampling, ecuador)
+#'     smp.fun = partition.cv, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2))
+#' summary(parnspres$error)
+#' summary(parnspres$represampling)
+#' plot(parnspres$represampling, ecuador)
 #'
 #' # Spatial 5-repeated 10-fold spatial cross-validation:
-#' spres = sperrorest(data = ecuador, formula = fo,
+#' parspres = parsperrorest(data = ecuador, formula = fo,
 #'     model.fun = rpart, model.args = list(control = ctrl),
 #'     pred.fun = mypred.rpart,
-#'     smp.fun = partition.kmeans, smp.args = list(repetition=1:5, nfold=10))
-#' summary(spres$error)
-#' summary(spres$represampling)
-#' plot(spres$represampling, ecuador)
+#'     smp.fun = partition.kmeans, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2))
+#' summary(parspres$error)
+#' summary(parspres$represampling)
+#' plot(parspres$represampling, ecuador)
 #' 
-#'  smry = data.frame(
-#'      nonspat.training = unlist(summary(nspres$error,level=1)$train.auroc),
-#'      nonspat.test     = unlist(summary(nspres$error,level=1)$test.auroc),
-#'      spatial.training = unlist(summary(spres$error,level=1)$train.auroc),
-#'      spatial.test     = unlist(summary(spres$error,level=1)$test.auroc))
+#' # only run this part of the example if importance = TRUE!
+#' smry = data.frame(
+#'     nonspat.training = unlist(summary(parnspres$error,level=1)$train.auroc),
+#'     nonspat.test     = unlist(summary(parnspres$error,level=1)$test.auroc),
+#'     spatial.training = unlist(summary(parspres$error,level=1)$train.auroc),
+#'     spatial.test     = unlist(summary(parspres$error,level=1)$test.auroc))
 #' boxplot(smry, col = c("red","red","red","green"), 
-#'      main = "Training vs. test, nonspatial vs. spatial",
-#'      ylab = "Area under the ROC curve")
+#'     main = "Training vs. test, nonspatial vs. spatial",
+#'     ylab = "Area under the ROC curve")
 #' @export
 parsperrorest = function(formula, data, coords = c("x", "y"),
                          model.fun, model.args = list(),
@@ -240,7 +246,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
           if (err.unpooled) {
             if (err.train) currentRes[[j]]$train = NULL #res[[i]][[j]]$train = NULL
             currentRes[[j]]$test = NULL #res[[i]][[j]]$test = 
-            if (importance) currentImpo[[j]] = c() # ???
+            if (importance) currentImpo[[j]] = c()
           }
           if (do.gc >= 2) gc()
           next # skip this fold
@@ -264,7 +270,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
         if (err.unpooled)
           if (do.try) {
             err.try = try(err.fun(nd[,response], pred.train), silent = silent)
-            if (class(err.try) == "try-error") err.try = NULL # ???
+            if (class(err.try) == "try-error") err.try = NULL
             currentRes[[j]]$train = err.try #res[[i]][[j]]$train = err.try
           } else {
             currentRes[[j]]$train = err.fun(nd[,response], pred.train) #res[[i]][[j]]$train = err.fun(nd[,response], pred.train)
@@ -296,7 +302,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
       if (err.unpooled) {
         if (do.try) {
           err.try = try(err.fun(nd[,response], pred.test), silent = silent)
-          if (class(err.try) == "try-error") err.try = NULL # ???
+          if (class(err.try) == "try-error") err.try = NULL
           currentRes[[j]]$test = err.try #res[[i]][[j]]$test = err.try
         } else {
           currentRes[[j]]$test = err.fun(nd[,response], pred.test) #res[[i]][[j]]$test  = err.fun(nd[,response], pred.test)
@@ -374,7 +380,7 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
                        sapply( y, as.data.frame ))), 
                        function(x) mean(unlist(x)) ))))
           rm(nd.bak, nd) # better safe than sorry...
-        } # end of else if (!is.null(res[[i]][[j]]$test))
+        } # end of else if (!is.null(currentres[[j]]$test))
       }
       
     }
@@ -447,11 +453,15 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
   if (importance) class(impo) = "sperrorestimportance"
   
   if(benchmark){
+    end.time = Sys.time()
     my.bench = list(system.info = Sys.info(),
+                    t.start = start.time,
+                    t.end = end.time,
                     cpu.cores = detectCores(),
                     par.mode = par.args$par.mode,
                     par.units = par.args$par.units,
-                    runtime.performance = Sys.time() - start.time)
+                    runtime.performance = end.time - start.time)
+    class(my.bench) = "sperrorestbenchmarks"
   }
   else my.bench = NULL
   
