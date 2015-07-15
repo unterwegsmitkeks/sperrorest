@@ -36,10 +36,13 @@
 #' @param do.gc numeric (default: 1): defines frequency of memory garbage collection by calling \code{\link{gc}}; if \code{<1}, no garbage collection; if \code{>=1}, run a \code{gc()} after each repetition; if \code{>=2}, after each fold
 #' @param do.try logical (default: \code{FALSE}): if \code{TRUE} [untested!!], use \code{\link{try}} to robustify calls to \code{model.fun} and \code{err.fun}; use with caution!
 #' @param silent If \code{TRUE}, show progress on console (in Windows Rgui, disable 'Buffered output' in 'Misc' menu)
-#' @param par.args Contains parallelization parameters \code{par.mode} (the method used for parallelization) and \code{par.units} (the number of parallel processing units). 
+#' @param par.args Contains parallelization parameters \code{par.mode} (the method used for parallelization), \code{par.units} (the number of parallel processing units), \code{lb} (logical, enable load balancing) and \code{high} (logical, use high-level parallelization function). 
 #' Setting \code{par.mode} to 1 will only work for Linux or Mac OS users, unless \code{par.units} is set to 1. 
 #' In that case the code will run on Windows machines, too. However, execution will be sequential due to only one CPU core being used. 
 #' Setting \code{par.mode} to 2 will work on all operating systems, but does not allow for individual workers to print progress to the R console (cf. \code{silent}).
+#' Setting \code{lb} to \code{TRUE} will enable load balancing. Instead of pre-scheduling tasks per worker, each worker will be given a new task as soon as it finishes its previous one.
+#' Setting \code{high} to \code{TRUE} will cause \code{parsperrorest} to use the high-level parallelization function \code{parLapply()} instead of its low-level equivalent \code{clusterApply()}. 
+#' This will only have an effect if \code{par.mode} is set to 2 and \code{lb} is \code{FALSE}.
 #' @param benchmark logical (default: \code{FALSE}): if \code{TRUE}, perform benchmarking and return \code{sperrorestbenchmarks} object
 #' @return A list (object of class \code{sperrorest}) with (up to) five components:
 #' \item{error}{a \code{sperroresterror} object containing predictive performances at the fold level}
@@ -78,7 +81,7 @@
 #' parnspres = parsperrorest(data = ecuador, formula = fo,
 #'     model.fun = rpart, model.args = list(control = ctrl),
 #'     pred.fun = mypred.rpart,
-#'     smp.fun = partition.cv, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2))
+#'     smp.fun = partition.cv, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2, lb=FALSE, high=TRUE))
 #' summary(parnspres$error)
 #' summary(parnspres$represampling)
 #' plot(parnspres$represampling, ecuador)
@@ -87,7 +90,7 @@
 #' parspres = parsperrorest(data = ecuador, formula = fo,
 #'     model.fun = rpart, model.args = list(control = ctrl),
 #'     pred.fun = mypred.rpart,
-#'     smp.fun = partition.kmeans, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2))
+#'     smp.fun = partition.kmeans, smp.args = list(repetition=1:5, nfold=10), par.args = list(par.mode = 2, par.units=2, lb=FALSE, high=TRUE))
 #' summary(parspres$error)
 #' summary(parspres$represampling)
 #' plot(parspres$represampling, ecuador)
@@ -418,13 +421,23 @@ parsperrorest = function(formula, data, coords = c("x", "y"),
     RNGkind("L'Ecuyer-CMRG")
     set.seed(1234567)
     mc.reset.stream() #set up RNG stream to obtain reproducible results
-    myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units)
+    if(par.args$lb == FALSE)
+      myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units)
+    else
+      myRes = mclapply(resamp, FUN = runreps, mc.cores = par.args$par.units, mc.preschedule = FALSE)
   }
   if(par.args$par.mode == 2){
     par.cl = makeCluster(par.args$par.units, type = "SOCK")
     clusterSetRNGStream(par.cl, 1234567) #set up RNG stream to obtain reproducible results
     force(pred.fun) #force evaluation of pred.fun, so it is serialized and provided to all cluster workers
-    myRes = parLapply(cl = par.cl, X = resamp, fun = runreps)
+    if(par.args$lb == FALSE){
+      if(par.args$high == TRUE)
+        myRes = parLapply(cl = par.cl, X = resamp, fun = runreps)
+      else
+        myRes = clusterApply(cl = par.cl, x = resamp, fun = runreps)
+    }
+    else
+      myRes = clusterApplyLB(cl = par.cl, x = resamp, fun = runreps)
     stopCluster(par.cl)
   }
   
